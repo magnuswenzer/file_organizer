@@ -5,12 +5,16 @@ from PIL import ImageTk, Image
 
 import re
 
-class ImageWidget(tk.Frame): 
+import utils
+
+
+class ImageWidget(tk.Frame):
 
 	def __init__(self, 
 				 parent, 
-   				 size=30, 
-				 prop_frame={}, 
+   				 size=20,
+				 prop_frame={},
+				 rotation_info_object=None,
 				 **kwargs): 
 
 		self.prop_frame = {}
@@ -26,6 +30,8 @@ class ImageWidget(tk.Frame):
 
 		self.image_path = None 
 		self.original_image = None
+		self.rotation_info_object = rotation_info_object
+		self.showed_image = False
 
 		if size > 1:
 			size = size / 100
@@ -33,20 +39,57 @@ class ImageWidget(tk.Frame):
 
 		self._set_frame()
 
-
 	def _set_frame(self):
-		self.label = tk.Label(self)
-		self.label.grid(row=0, column=0) 
+
+		try:
+			self.main_frame.destroy()
+		except:
+			pass
+
+		self.main_frame = tk.Frame(self)
+		self.main_frame.grid(row=0, column=0)
 		grid_configure(self)
 
-	def show_image(self, image_path):
-		self.image_path = image_path 
-		self.original_image = Image.open(self.image_path)
-		width, height = self.original_image.size 
-		self.image = self.original_image.resize((int(width*self.size), int(height*self.size)))
-		self.tk_image = ImageTk.PhotoImage(self.image)
-		self.label.configure(image=self.tk_image)
-		self.label.image = self.tk_image
+		self.stringvar = tk.StringVar()
+		self.label = tk.Label(self.main_frame, textvariable=self.stringvar)
+		self.label.grid(row=0, column=0) 
+		grid_configure(self.main_frame)
+
+	def show_image(self, image_path, rotate=None):
+		self.image_path = image_path
+		print('=')
+		print('self.showed_image', self.showed_image)
+		print('image_path', image_path)
+
+		try:
+			if not self.showed_image:
+				self._set_frame()
+			self.original_image = Image.open(str(self.image_path))
+			width, height = self.original_image.size
+			self.image = self.original_image.resize((int(width*self.size), int(height*self.size)))
+			if rotate:
+				if self.rotation_info_object:
+					rotate = self.rotation_info_object.get(self.image_path.name) + rotate
+					self.rotation_info_object.set(self.image_path.name, rotate)
+			else:
+				if self.rotation_info_object:
+					rotate = self.rotation_info_object.get(self.image_path.name)
+				else:
+					rotate = 0
+			self.image = self.image.rotate(rotate)
+			self.tk_image = ImageTk.PhotoImage(self.image)
+			# create new label here
+			self.label.configure(image=self.tk_image)
+			self.label.image = self.tk_image
+			self.showed_image = True
+			return True
+		except:
+			if self.showed_image:
+				self._set_frame()
+			self.stringvar.set(self.image_path)
+			self.image_path = None
+			self.showed_image = False
+			return False
 
 	def set_size(self, size): 
 		if size > 1:
@@ -54,15 +97,23 @@ class ImageWidget(tk.Frame):
 		self.size = size 
 		self.show_image(self.image_path)
 
+	def rotate_left(self):
+		self.show_image(self.image_path, rotate=90)
+
+	def rotate_right(self):
+		self.show_image(self.image_path, rotate=-90)
 
 
 class ImageViewWidget(tk.Frame): 
 
 	def __init__(self, 
-				 parent, 
+				 parent,
+				 callback_change_image=None,
+				 rotation_info_object=None,
 				 prop_frame={}, 
 				 **kwargs): 
 
+		self.callback_change_image = callback_change_image
 		self.prop_frame = {}
 		self.prop_frame.update(prop_frame)
 
@@ -72,20 +123,375 @@ class ImageViewWidget(tk.Frame):
 		self.grid_frame.update(kwargs)
 
 		tk.Frame.__init__(self, parent, **self.prop_frame)
-		self.grid(**self.grid_frame)  
+		self.grid(**self.grid_frame)
+
+		self.rotation_info_object = rotation_info_object
+
+		self.current_index = None  # index in image list
+		self.current_image = None
+
+		self._set_frame()
+
+		self._set_binding_keys()
 
 	def _set_frame(self):
-		self.image_widget = widgets.ImageWidget(self.frame_main)
+		layout = dict(padx=5,
+					  pady=5,
+					  sticky='nsew')
+		# self.stringvar_file_name = tk.StringVar()
+		# tk.Label(self, textvariable=self.stringvar_file_name).grid(row=0, column=0, **layout)
+		self.image_widget = ImageWidget(self,
+										rotation_info_object=self.rotation_info_object,
+										row=0, columnspan=3, **layout)
+
+		self.button_previous = tk.Button(self, text='Tillbaka', command=self._previous, state='disabled')
+		self.button_previous.grid(row=1, column=0, **layout)
+
+		self.stringvar_file_nr = tk.StringVar()
+		self.label_file_nr = tk.Label(self, textvariable=self.stringvar_file_nr)
+		self.label_file_nr.grid(row=1, column=1, **layout)
+
+		self.button_next = tk.Button(self, text='Nasta', command=self._next, state='disabled')
+		self.button_next.grid(row=1, column=2, **layout)
+
+		self.button_rotate_left = tk.Button(self, text='Rotera vanster', command=self._rotate_left, state='disabled')
+		self.button_rotate_left.grid(row=2, column=0, **layout)
+
+		self.button_rotate_right = tk.Button(self, text='Rotera hoger', command=self._rotate_right, state='disabled')
+		self.button_rotate_right.grid(row=2, column=2, **layout)
+
+		grid_configure(self, nr_columns=3, nr_rows=3)
+
+	def _set_binding_keys(self):
+		self.bind('<Left>', self._previous)
+		self.bind('<Right>', self._next)
+		self.bind('l', self._rotate_left)
+		self.bind('r', self._rotate_right)
+
+	def _update_widgets(self):
+		# Set status for buttons
+		self.button_previous.config(state='normal')
+		self.button_next.config(state='normal')
+		self.button_rotate_left.config(state='normal')
+		self.button_rotate_right.config(state='normal')
+		if self.current_index == 0:
+			self.button_previous.config(state='disabled')
+		elif self.current_index == (self.nr_files - 1):
+			self.button_next.config(state='disabled')
+
+		# Display nr files
+		self.stringvar_file_nr.set(f'{self.current_index+1} / {self.nr_files}')
+
+	def _previous(self, event=None):
+		self.current_index -= 1
+		self._show_image()
+		self.focus_set()
+
+	def _next(self, event=None):
+		self.current_index += 1
+		self._show_image()
+		self.focus_set()
+
+	def _show_image(self):
+		self._update_widgets()
+		# print('='*40)
+		# print(str(self.image_list[self.current_index]))
+		# print('-'*40)
+		# print('\n'.join([str(im) for im in self.image_list[(self.current_index-2):(self.current_index+2)]]))
+		self.current_image = self.image_list[self.current_index]
+		ok = self.image_widget.show_image(self.current_image)
+		# self.stringvar_file_name.set(self.current_image)
+		if self.callback_change_image:
+			if ok:
+				self.callback_change_image(self.current_image, True)
+			else:
+				self.callback_change_image(self.current_image, False)
+
+	def _rotate_left(self, event=None):
+		self.image_widget.rotate_left()
+		self.focus_set()
+
+	def _rotate_right(self, event=None):
+		self.image_widget.rotate_right()
+		self.focus_set()
+
+	def set_image_list(self, image_list):
+		"""
+		image_list is a list of paths.
+		"""
+		if self.current_index is None:
+			self.current_index = 0
+		else:
+			current_image = self.image_list[self.current_index]
+			if current_image in image_list:
+				self.current_index = image_list.index(current_image)
+			else:
+				self.current_index = 0
+		self.image_list = image_list
+		self.nr_files = len(self.image_list)
+		self._show_image()
+
+	def set_image_size(self, size):
+		self.image_widget.set_size(size)
+
+
+class SelectTagWidget(tk.Frame):
+	def __init__(self,
+				 parent,
+				 tag_type_names=None,
+				 year_list=[],
+				 prop_frame={},
+				 **kwargs):
+
+		self.tag_type_names = tag_type_names
+		self.intvars = {}
+		self.prop_frame = {}
+		self.prop_frame.update(prop_frame)
+
+		self.grid_frame = {'padx': 5,
+						   'pady': 5,
+						   'sticky': 'nsew'}
+		self.grid_frame.update(kwargs)
+
+		tk.Frame.__init__(self, parent, **self.prop_frame)
+		self.grid(**self.grid_frame)
+
+		self.year_list = [str(y) for y in year_list]
+
+		self.month_list = utils.get_swe_month_list()
+		self.month_to_num = {}
+		for n, m in enumerate(self.month_list):
+			self.month_to_num[m] = n + 1
+
+		self._set_frame()
+
+	def _set_frame(self):
+		layout = dict(padx=5,
+					  pady=5,
+					  sticky='nsew')
+
+		self.tag_widget = TagWidget(self, **layout)
+		self.tag_widget.update_frame(self.tag_type_names)
+
+		self.time_frame = tk.LabelFrame(self, text='Tid')
+		self.time_frame.grid(row=0, column=1, **layout)
+
+		grid_configure(self, nr_columns=2)
+
+		self._set_frame_time()
+
+	def _set_frame_time(self):
+		frame = self.time_frame
+
+		layout = dict(padx=5,
+					  pady=5,
+					  sticky='nsew')
+		self.stringvar_month = tk.StringVar()
+		self.combobox_month = ttk.Combobox(frame, textvariable=self.stringvar_month)
+		self.combobox_month.grid(row=0, column=0, **layout)
+		self.combobox_month['values'] = [''] + self.month_list
+		self.combobox_month.config(state='readonly')
+
+		self.stringvar_year = tk.StringVar()
+		self.combobox_year = ttk.Combobox(frame, textvariable=self.stringvar_year)
+		self.combobox_year.grid(row=1, column=0, **layout)
+		self.combobox_year['values'] = [''] + self.year_list
+		self.combobox_year.config(state='readonly')
+
+		grid_configure(self, nr_rows=2)
+
+	def get_filter(self):
+		selected_filter = {}
+		selected_filter['tags'] = self.tag_widget.get_checked()
+		if 'otaggade' in selected_filter['tags']:
+			selected_filter['tags'].pop(selected_filter['tags'].index('otaggade'))
+			selected_filter['otaggade'] = True
+		else:
+			selected_filter['otaggade'] = False
+
+		month = self.stringvar_month.get()
+		if not month:
+			month = None
+		else:
+			month = self.month_to_num.get(month)
+		selected_filter['month'] = month
+
+		year = self.stringvar_year.get().strip()
+		if not year:
+			year = None
+		else:
+			year = int(year)
+		selected_filter['year'] = year
+
+		return selected_filter
+
+
+
+class TagWidget(tk.Frame):
+	def __init__(self,
+				 parent,
+				 callback=None,
+				 show_untagged=True,
+				 prop_frame={},
+				 **kwargs):
+
+		self.callback = callback
+		self.show_untagged = show_untagged
+		self.intvars = {}
+		self.prop_frame = {}
+		self.prop_frame.update(prop_frame)
+
+		self.grid_frame = {'padx': 5,
+						   'pady': 5,
+						   'sticky': 'nsew'}
+		self.grid_frame.update(kwargs)
+
+		tk.Frame.__init__(self, parent, **self.prop_frame)
+		self.grid(**self.grid_frame)
+
+	def update_frame(self, tag_types_names):
+		"""
+		tag_types_names is a dict with tag type as keys and corresponding tag names as values (in a list)
+		"""
+		try:
+			self.main_frame.destroy()
+		except:
+			print('Could not destroy main frame')
+
+		layout = dict(padx=5,
+					  pady=5,
+					  sticky='nsew')
+
+		self.main_frame = tk.Frame(self)
+		self.main_frame.grid(row=0, column=0, **layout)
+
+		self.frame_untagged = tk.Frame(self)
+		self.frame_untagged.grid(row=1, column=0, **layout)
+
+		grid_configure(self, nr_rows=2, r1=10)
+
+		self.layout = dict(padx=5,
+						   pady=5,
+						   sticky='nsew')
+
+		self._set_frame_main(tag_types_names)
+		self._set_frame_untagged()
+
+	def _set_frame_main(self, tag_types_names):
+		r = 0
+		c = 0
+		self.intvars = {}
+		self.labelframes = {}
+		for tag_type in sorted(tag_types_names):
+			self.labelframes[tag_type] = tk.LabelFrame(self.main_frame, text=tag_type.capitalize())
+			self.labelframes[tag_type].grid(row=r, column=c, **self.layout)
+			nr = 0
+			for tag_name in tag_types_names[tag_type]:
+				self.intvars[tag_name] = tk.IntVar()
+				cb = tk.Checkbutton(self.labelframes[tag_type], text=tag_name.capitalize(), variable=self.intvars[tag_name],
+								    command=lambda x=tag_name: self._check(x))
+				cb.grid(row=nr, column=0, padx=5, sticky='w')
+				nr += 1
+			grid_configure(self.labelframes[tag_type], nr_columns=1, nr_rows=nr)
+			r += 1
+			if not r % 4:
+				r = 0
+				c += 1
+		grid_configure(self.main_frame, nr_rows=5, nr_columns=c+1)
+
+	def _set_frame_untagged(self):
+		self.intvar_untagged = tk.IntVar()
+		self.checkbutton_untagged = tk.Checkbutton(self.frame_untagged, text='Otaggade', variable=self.intvar_untagged)
+		if self.show_untagged:
+			self.checkbutton_untagged.grid(row=0, column=0, **self.layout)
+		grid_configure(self.frame_untagged)
+
+
+	def set_checked(self, tags):
+		for tag, value in self.intvars.items():
+			if tag in tags:
+				value.set(1)
+			else:
+				value.set(0)
+
+	def uncheck_all(self):
+		for tag, value in self.intvars.items():
+			value.set(0)
+
+	def _check(self, tag_name):
+		if not self.callback:
+			return
+		if self.intvars[tag_name].get():
+			return self.callback(tag_name, True)
+		else:
+			return self.callback(tag_name, False)
+
+	def get_checked(self):
+		checked_tags = [tag_name for tag_name in self.intvars if self.intvars[tag_name].get()]
+		if self.intvar_untagged.get():
+			checked_tags.append('otaggade')
+		return checked_tags
+
+
+class FilterPopup(tk.Toplevel):
+
+	def __init__(self, parent,
+				 tag_type_names=None,
+				 year_list=[],
+				 callback_ok=None,
+				 callback_cancel=None):
+		self.tag_type_names = tag_type_names
+		self.year_list = year_list
+		self.callback_ok = callback_ok
+		self.callback_cancel = callback_cancel
+		tk.Toplevel.__init__(self, parent)
+
+		self.protocol('WM_DELETE_WINDOW', self._close_window)
+
+		self._set_frame()
+
+	def _close_window(self):
+		if self.callback_cancel:
+			self.callback_cancel()
+
+	def _set_frame(self):
+		layout = dict(padx=5,
+					  pady=5,
+					  sticky='nsew')
+		self.select_tag_widget = SelectTagWidget(self,
+												 tag_type_names=self.tag_type_names,
+												 year_list=self.year_list,
+												 row=0, column=0,
+												 columnspan=2,
+												 **layout)
+
+		self.button_ok = tk.Button(self, text='Valj', command=self._callback_ok)
+		self.button_ok.grid(row=1, column=0, **layout)
+
+		self.button_cancel = tk.Button(self, text='Avbryt', command=self.callback_cancel)
+		self.button_cancel.grid(row=1, column=1, **layout)
+
+	def _callback_ok(self):
+		if not self.callback_ok:
+			return
+
+		selected_filter = self.select_tag_widget.get_filter()
+		self.callback_ok(selected_filter)
+
+	def callback_cancel(self):
+		if not self.callback_cancel:
+			return
+		self.callback_cancel()
+
 
 
 class NotebookWidget(ttk.Notebook):
-	 
+
 	def __init__(self, 
-				 parent, 
+				 parent,
 				 tabs=[], 
 				 notebook_prop={}, 
 				 **kwargs):
-		
 		self.tab_list = tabs
 		self.notebook_prop = {}
 		self.notebook_prop.update(notebook_prop)
@@ -94,15 +500,12 @@ class NotebookWidget(ttk.Notebook):
 							  'pady': 5, 
 							  'sticky': 'nsew'}
 		self.grid_notebook.update(kwargs)
-		
 		ttk.Notebook.__init__(self, parent, **self.notebook_prop)
 		self.grid(**self.grid_notebook)
 		
 		self.tab_dict = {}
 		self._set_widget()
-		
-	
-	#===========================================================================
+
 	def _set_widget(self):
 				
 		for tab in self.tab_list:
@@ -126,9 +529,217 @@ class NotebookWidget(ttk.Notebook):
 	def get_selcted_tab(self):
 		return self.tab(self.select(), "text")
 
-	#===========================================================================
 	def get_frame(self, tab):
 		return self.tab_dict[tab]
+
+
+class FileTreeviewWidget(tk.Frame):
+	"""
+	"""
+
+	def __init__(self,
+				 parent,
+				 prop_frame={},
+				 prop_listbox={},
+				 columns=[],
+				 data={},
+				 callback=None,
+				 **kwargs):
+
+		# Update kwargs dict
+		self.prop_frame = {}
+		self.prop_frame.update(prop_frame)
+
+		self.prop_listbox = {'bg': 'grey'}
+		self.prop_listbox.update(prop_listbox)
+
+		self.grid_frame = {'row': 0,
+						   'column': 0,
+						   'sticky': 'nsew',
+						   'padx': 5,
+						   'pady': 5}
+		self.grid_frame.update(kwargs)
+
+		self.columns = columns
+		self.data = data
+		self.callback = callback
+
+		tk.Frame.__init__(self, parent, **self.prop_frame)
+		self.grid(**self.grid_frame)
+
+		self._set_frame()
+
+	def _set_frame(self):
+
+		padx = 2
+		pady = 2
+		frame = tk.Frame(self)
+		frame.grid(row=0, column=0, padx=padx, pady=pady, sticky='nsew')
+		grid_configure(self)
+
+		self.tree = ttk.Treeview(frame)
+		self.tree.grid(row=0, column=0, padx=padx, pady=pady, sticky='nsew')
+		self.tree.bind('<<TreeviewSelect>>', self._on_select)
+
+		self.column_mapping = dict((item, f'#{i}') for i, item in enumerate(self.columns))
+
+		self.tree['columns'] = self.columns[1:]
+		for c, name in enumerate(self.columns):
+			self.tree.column(self.column_mapping.get(name), width=270, minwidth=270, stretch=tk.NO)
+			self.tree.heading(self.column_mapping.get(name), text=name.capitalize(), anchor='w')
+
+		# tree["columns"] = ("one", "two", "three")
+		# tree.column("#0", width=270, minwidth=270, stretch=tk.NO)
+		# tree.column("one", width=150, minwidth=150, stretch=tk.NO)
+		# tree.column("two", width=400, minwidth=200)
+		# tree.column("three", width=80, minwidth=50, stretch=tk.NO)
+
+		self.items = dict()
+		for year in sorted(self.data):
+			iid = '-year-' + str(year)
+			self.items[year] = dict()
+			self.items[year]['value'] = self.tree.insert("", 1, iid=iid, text=str(year), values=(''))
+			for month in sorted(self.data[year]):
+				iid = '-year-month-' + str(year)+str(month)
+				self.items[year][month] = dict()
+				self.items[year][month]['value'] = self.tree.insert(self.items[year]['value'], 'end', iid=iid,
+																	text=str(month), values=(''))
+				for file_name in self.data[year][month]:
+					iid = file_name
+					self.items[year][month][file_name] = dict()
+					self.items[year][month][file_name]['value'] = self.tree.insert(self.items[year][month]['value'],
+																				   "end", iid=iid, text=file_name,
+																				   values=(''))
+
+	def _on_select(self, event=None):
+		selected_files = [item for item in self.tree.selection() if not item.startswith('-year-')]
+		print(selected_files)
+		if self.callback:
+			self.callback(selected_files)
+
+	def get_selected(self):
+		return [item for item in self.tree.selection() if not item.startswith('-year-')]
+
+# # Level 1
+# folder1=tree.insert("", 1, "", text="Folder 1", values=("23-Jun-17 11:05","File folder",""))
+# tree.insert("", 2, "", text="text_file.txt", values=("23-Jun-17 11:25","TXT file","1 KB"))
+# # Level 2
+# tree.insert(folder1, "end", "", text="photo1.png", values=("23-Jun-17 11:28","PNG file","2.6 KB"))
+# tree.insert(folder1, "end", "", text="photo2.png", values=("23-Jun-17 11:29","PNG file","3.2 KB"))
+# tree.insert(folder1, "end", "", text="photo3.png", values=("23-Jun-17 11:30","PNG file","3.1 KB"))
+
+
+class test_ListboxMultiselectWidget(tk.Frame):
+	"""
+	"""
+
+	def __init__(self,
+				 parent,
+				 prop_frame={},
+				 prop_listbox={},
+				 items=[],
+				 **kwargs):
+
+		# Update kwargs dict
+		self.prop_frame = {}
+		self.prop_frame.update(prop_frame)
+
+		self.prop_listbox = {'bg': 'grey'}
+		self.prop_listbox.update(prop_listbox)
+
+		self.grid_frame = {'row': 0,
+						   'column': 0,
+						   'sticky': 'nsew',
+						   'padx': 5,
+						   'pady': 5}
+		self.grid_frame.update(kwargs)
+
+		self.items = items
+		self.selected_items = []
+
+		tk.Frame.__init__(self, parent, **self.prop_frame)
+		self.grid(**self.grid_frame)
+
+		self._set_frame()
+
+		self.index_min = None
+		self.index_max = None
+		self.index_last = None
+
+
+	def _set_frame(self):
+
+		padx = 2
+		pady = 2
+		frame = tk.Frame(self)
+		frame.grid(row=0, column=0, padx=padx, pady=pady, sticky='nsew')
+		grid_configure(self)
+
+		r = 0
+		self.listbox = tk.Listbox(frame, selectmode='single', **self.prop_listbox)
+		self.listbox.grid(row=r, column=0, padx=padx, pady=pady, sticky='nsew')
+		self.scrollbar = ttk.Scrollbar(frame,
+									   orient='vertical',
+									   command=self.listbox.yview)
+		self.scrollbar.grid(row=r, column=1, pady=pady, sticky='nsw')
+		self.listbox.configure(yscrollcommand=self.scrollbar.set)
+		self.listbox.bind('<<ListboxSelect>>', self._on_select)
+
+		grid_configure(frame, nr_rows=1, nr_columns=2, c0=10)
+
+	def _on_select(self, event):
+		selection = self.listbox.curselection()
+		clicked_index = selection[0]
+		print('Clicked index ', clicked_index)
+
+		if self.index_last is None:
+			self.index_last = clicked_index
+
+		if all([self.index_min is None, self.index_max is None]):
+			self.index_min = self.index_max = clicked_index
+		else:
+			if clicked_index == self.index_max:
+				self.index_min = self.index_max
+			elif clicked_index == self.index_min:
+				self.index_max = self.index_min
+			elif clicked_index > self.index_min:
+				self.index_max = clicked_index
+			else:
+				self.index_min = clicked_index
+
+		self.listbox.selection_clear(0, u'end')
+		self.listbox.update_idletasks()
+		self.listbox.selection_set(self.index_min, self.index_max)
+		self.selected_items = self.items[self.index_min:self.index_max+1]
+		print(self.selected_items)
+
+		self.index_last = clicked_index
+
+	def update_items(self, items):
+		self.items = items
+		self._update_items()
+
+	def _update_items(self):
+		# Delete old entries
+		self.listbox.delete(0, 'end')
+
+		# Add new entries
+		try:
+			self.items = sorted(self.items, key=int)
+		except:
+			self.items = sorted(self.items)
+
+		for item in self.items:
+			self.listbox.insert('end', item)
+
+	def get_items(self):
+		return self.items[:]
+
+	def get_selected(self):
+		selection = self.listbox.curselection()
+		if selection:
+			index_to_pop = int(selection[0])
+			return self.items[index_to_pop]
 
 
 class ListboxWidget(tk.Frame):
@@ -136,97 +747,97 @@ class ListboxWidget(tk.Frame):
 	Originally developed by me at SMHI (https://github.com/sharksmhi/sharkpylib/tree/master/sharkpylib/tklib). 
 	Now modified.	  
 	"""
-	
-	def __init__(self, 
-				 parent, 
-				 prop_frame={}, 
+
+	def __init__(self,
+				 parent,
+				 prop_frame={},
 				 prop_listbox={},
-				 items=[], 
-				 only_unique_items=True, 
+				 items=[],
+				 only_unique_items=True,
 				 include_delete_button='',
 				 callback_delete_button=None,  # returns the removed item
 				 title='',
 				 **kwargs):
-		
+
 		# Update kwargs dict
 		self.prop_frame = {}
 		self.prop_frame.update(prop_frame)
-		
+
 		self.prop_listbox = {'bg': 'grey'}
-		self.prop_listbox.update(prop_listbox)		
-		
+		self.prop_listbox.update(prop_listbox)
+
 		self.grid_frame = {'row': 0,
 						   'column': 0,
 						   'sticky': 'nsew',
 						   'padx': 5,
 						   'pady': 5}
 		self.grid_frame.update(kwargs)
-		
+
 		self.title = title
 		self.items = items
-		self.only_unique_items = only_unique_items 
+		self.only_unique_items = only_unique_items
 		self.include_delete_button = include_delete_button
 		self.callback_delete_button = callback_delete_button
 
 		tk.Frame.__init__(self, parent, **self.prop_frame)
-		self.grid(**self.grid_frame) 
-		
+		self.grid(**self.grid_frame)
+
 		self._set_frame()
-	
+
 	def _set_frame(self):
-		
+
 		padx = 2
 		pady = 2
 		frame = tk.Frame(self)
 		frame.grid(row=0, column=0, padx=padx, pady=pady, sticky='nsew')
-		grid_configure(self) 
-		
-		r=0
+		grid_configure(self)
+
+		r = 0
 		self.listbox = tk.Listbox(frame, selectmode='single', **self.prop_listbox)
 		self.listbox.grid(row=r, column=0, padx=padx, pady=pady, sticky='nsew')
-		self.scrollbar = ttk.Scrollbar(frame, 
-									   orient='vertical', 
+		self.scrollbar = ttk.Scrollbar(frame,
+									   orient='vertical',
 									   command=self.listbox.yview)
 		self.scrollbar.grid(row=r, column=1, pady=pady, sticky='nsw')
 		self.listbox.configure(yscrollcommand=self.scrollbar.set)
-		
-		if self.include_delete_button: 
-			r+=1
-			button_text = 'Delete' 
+
+		if self.include_delete_button:
+			r += 1
+			button_text = 'Delete'
 			if type(self.include_delete_button) == str:
 				button_text = self.include_delete_button
 			self.button_delete = ttk.Button(frame, text=button_text, command=self._on_delete_item)
 			self.button_delete.grid(row=r, column=0, padx=padx, pady=pady, sticky='w')
-		
-		grid_configure(frame, nr_rows=r+1, nr_columns=2, c0=10) 
-		
+
+		grid_configure(frame, nr_rows=r + 1, nr_columns=2, c0=10)
+
 	def add_item(self, item):
-		self.items.append(item) 
+		self.items.append(item)
 		self._update_items()
-		
+
 	def remove_item(self, item):
 		if item in self.items:
 			self.items.remove(item)
 		self._update_items()
-		
-	def _on_delete_item(self, event=None): 
+
+	def _on_delete_item(self, event=None):
 		selection = self.listbox.curselection()
 		if selection:
 			index_to_pop = int(selection[0])
 			item = self.items[index_to_pop]
-			self.items.pop(index_to_pop) 
+			self.items.pop(index_to_pop)
 			self._update_items()
 			if self.callback_delete_button:
 				self.callback_delete_button(item)
-		
+
 	def update_items(self, items):
 		self.items = items
 		self._update_items()
-	
-	def _update_items(self): 
+
+	def _update_items(self):
 		# Delete old entries
 		self.listbox.delete(0, 'end')
-		
+
 		if self.only_unique_items:
 			self.items = list(set(self.items))
 		# Add new entries
@@ -234,12 +845,25 @@ class ListboxWidget(tk.Frame):
 			self.items = sorted(self.items, key=int)
 		except:
 			self.items = sorted(self.items)
-			
-		for item in self.items:  
+
+		for item in self.items:
 			self.listbox.insert('end', item)
 
 	def get_items(self):
 		return self.items[:]
+
+	def get_selected(self):
+		selection = self.listbox.curselection()
+		if selection:
+			index_to_pop = int(selection[0])
+			return self.items[index_to_pop]
+
+	def pop_selected(self):
+		selection = self.listbox.curselection()
+		if selection:
+			index_to_pop = int(selection[0])
+			self.items.pop(index_to_pop)
+			self._update_items()
 
 
 class ListboxSelectionWidget(tk.Frame):

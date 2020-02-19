@@ -1,1 +1,4 @@
 from .frame_add_tags import FrameAddTags
+from .frame_add_pictures import FrameAddPictures
+from .frame_view_pictures import FrameViewPictures
+from .frame_tag_pictures import FrameTagPictures

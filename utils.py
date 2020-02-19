@@ -1,11 +1,12 @@
 import os 
-from pathlib import Path 
+from pathlib import Path
+import json
 
     
 class Month(object):
     def __init__(self, nr=1):
         self._create_month_mapping()
-        self.nr = nr
+        self.nr = int(nr)
         
     def __str__(self): 
         return self._num_to_str.get(self.nr).capitalize()
@@ -57,21 +58,36 @@ class Month(object):
 
     def _create_month_mapping(self):
         self._num_list = list(range(1, 13))
-        self._str_list = ['januari', 
-                            'februari', 
-                            'mars', 
-                            'april', 
-                            'maj', 
-                            'juni', 
-                            'juli', 
-                            'augusti', 
-                            'september',  
-                            'oktober',  
-                            'november', 
-                            'december']
+        self._str_list = get_swe_month_list()
+
         self._num_to_str = {}
         
         self._str_to_num = dict(zip(self._str_list, self._num_list))
         self._num_to_str = dict(zip(self._num_list, self._str_list))
        
+
+def get_swe_month_list():
+    return ['januari',
+            'februari',
+            'mars',
+            'april',
+            'maj',
+            'juni',
+            'juli',
+            'augusti',
+            'september',
+            'oktober',
+            'november',
+            'december']
+
+
+def get_file_types_in_directory_tree(directory):
+    suffix_set = set()
+    for root, dirs, files in os.walk(directory, topdown=True):
+        for name in files:
+            p = Path(root, name)
+            if not p.is_file():
+                continue
+            suffix_set.add(p.suffix)
+    return sorted(suffix_set)
 

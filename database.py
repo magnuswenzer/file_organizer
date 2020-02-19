@@ -34,6 +34,8 @@ class FileDatabase(object):
 		Creates the database by simply connecting to it. 
 		"""
 		print(f'Creating tables at: {self.location}')
+
+		self.file_items = ['Filnamn', 'Plats', 'Källa', 'Filtyp', 'Tid', 'År', 'Månad']
 		
 		# Create table Files 
 		sql_files = """
@@ -42,7 +44,9 @@ class FileDatabase(object):
 			location text NOT NULL,
 			source text NOT NULL, 
 			suffix text NOT NULL, 
-			time timestamp 
+			time timestamp, 
+			year integer NOT NULL, 
+			month integer NOT NULL 
 			);
 			"""
 		self._execute(sql_files)
@@ -68,7 +72,7 @@ class FileDatabase(object):
 		# Create table FileTagNames 
 		sql_file_tag_names = """
 			CREATE TABLE IF NOT EXISTS FileTagName (
-			file_name integer NOT NULL, 
+			file_name text NOT NULL, 
 			tag_name text NOT NULL, 
 			PRIMARY KEY (file_name, tag_name)
 			FOREIGN KEY (file_name) REFERENCES File (file_name), 
@@ -89,28 +93,32 @@ class FileDatabase(object):
 		# if result: 
 		# 	raise OriginalFileExistsError(file_object.original_path_object.name)
 
-		# Check if file name already exists in database. 
-		data = self.get_selection('File', 'file_name', 'location', file_name=file_object.file_name)
+		# Check if file name already exists in database.
+		file_name_list = self.get_file_name_list()
+		# data = self.get_selection('File', 'file_name', 'location', file_name=file_object.file_name)
 
 		# sql_select = """SELECT * FROM File WHERE file_name=(?)"""
 		# variables = (file_object.new_path_object.name, )
 		# result = self._execute(sql_select, variables=variables, fetchall=True)
-		
-		if data['file_name']: 
-			if data['location'][0] != file_object.location:
-				raise WrongLocation(file_object.location)
-			else:
-				raise FileAlreadyInDatabase(file_object.file_name)
+		if file_object.file_name in file_name_list:
+			return
+		# if data['file_name']:
+		# 	if data['location'][0] != file_object.location:
+		# 		raise WrongLocation(file_object.location)
+		# 	else:
+		# 		raise FileAlreadyInDatabase(file_object.file_name)
 
 		sql_insert = """
-			INSERT INTO File (file_name, location, source, suffix, time) 
-			VALUES (?, ?, ?, ?, ?)
+			INSERT INTO File (file_name, location, source, suffix, time, year, month) 
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 			"""
 		variables = (file_object.file_name, 
 					 file_object.location, 
 					 file_object.source, 
 					 file_object.suffix, 
-					 file_object.time)
+					 file_object.time,
+					 file_object.time.year,
+					 file_object.time.month)
 
 		return self._execute(sql_insert, variables=variables) 
 
@@ -122,7 +130,6 @@ class FileDatabase(object):
 			except NewFileExistsError:
 				not_added.append(file_object)
 		return not_added
-
 
 	def add_tag_type(self, tag_type):
 		"""
@@ -237,12 +244,29 @@ class FileDatabase(object):
 			return_list = return_list[:nr] 
 		return return_list
 
-	def get_file_names_with_tags(self, tags, and_or='AND'): 
+	def old_get_file_names_with_tags(self, tags=None, and_or='AND', year=None, month=None):
+		def add_year():
+			string = """"""
+			if year:
+				string = f""" 
+				AND year = "{year}"
+				"""
+			return string
+
+		def add_month():
+			string = """"""
+			if month:
+				string = f""" 
+				AND month = "{month}"
+				"""
+			return string
+
 		if type(tags) == str:
 			sql = f"""
 				SELECT file_name FROM FileTagName 
 				WHERE tag_name = "{tags}"
 				"""
+			sql = sql + add_year() + add_month()
 			return [item[0] for item in self._select(sql, fetchall=True)] 
 
 		else:
@@ -252,6 +276,7 @@ class FileDatabase(object):
 					SELECT file_name FROM FileTagName 
 					WHERE tag_name = "{tag}"
 					"""
+				sql = sql + add_year() + add_month()
 				result = [item[0] for item in self._select(sql, fetchall=True)] 
 				if not set_result:
 					set_result = set(result)
@@ -263,7 +288,7 @@ class FileDatabase(object):
 					set_result = set_result.intersection(set_r)
 			return list(set_result)
 
-	def get_selection(self, table, *args, and_or='AND', by_column=True, **kwargs): 
+	def old_get_selection(self, table, *args, and_or='AND', by_column=True, **kwargs):
 		"""
 		Crates a dynamic sql select query and returns a dictionary with the result.  
 		""" 
@@ -294,7 +319,6 @@ class FileDatabase(object):
 				data.append(dict(zip(args, row)))
 		return data
 
-
 	def get_tag_type_list(self): 
 		"""
 		Returns a list of all availbale tag types. 
@@ -320,9 +344,9 @@ class FileDatabase(object):
 			SELECT tag_name 
 			FROM TagName
 			"""
-		return [item[0] for item in self._select(sql, fetchall=True)] 
+		return [item[0] for item in self._select(sql, fetchall=True)]
 
-	def get_tags_for_file(self, file_name): 
+	def get_tags_for_file(self, file_name):
 		"""
 		Returns a list of all tags linked to the given file_name. 
 		SELECT a1, a2, b1, b2
@@ -330,15 +354,151 @@ class FileDatabase(object):
 		INNER JOIN B on B.f = A.f;
 		"""
 		sql = f"""
-			SELECT TagName.tag_name, TagName.tag_type
-			FROM FileTagName
-			INNER JOIN TagName ON TagName.tag_name = FileTagName.tag_name
-			WHERE file_name = "{file_name}"
-			"""
-		return self._select(sql, fetchall=True)
-		return [item[0] for item in self._select(sql, fetchall=True)] 
+				SELECT tag_name
+				FROM FileTagName
+				WHERE file_name = "{file_name}"
+				"""
+		return [item[0] for item in self._select(sql, fetchall=True)]
 
-	def _insert(self, *args, **kwargs): 
+	def old_get_file_list(self, tags=[], year=None, month=None, sort_by='time'):
+		"""
+		"""
+		if not any([tags, year, month]):
+			sql = f"""
+						SELECT file_name 
+						From File
+						ORDER BY File.{sort_by}
+					"""
+			print('SQL:', sql)
+			return [item[0] for item in self._select(sql, fetchall=True)]
+
+		file_set = None
+		for tag in tags:
+			sql = f"""
+				SELECT File.file_name
+				FROM File LEFT JOIN FileTagName ON File.file_name = FileTagName.file_name
+				WHERE FileTagName.tag_name = "{tag}"
+				ORDER BY File.{sort_by}
+
+			"""
+			print('SQL:', sql)
+			result_list = [item[0] for item in self._select(sql, fetchall=True)]
+			print(result_list)
+			if not file_set:
+				file_set = set(result_list)
+			else:
+				file_set = file_set.intersection(set(result_list))
+
+		if year:
+			sql = f"""
+				SELECT file_name
+				FROM File
+				WHERE year = {year}
+				ORDER BY {sort_by}
+
+			"""
+			result_list = [item[0] for item in self._select(sql, fetchall=True)]
+			print(result_list)
+			file_set = file_set.intersection(set(result_list))
+		if month:
+			sql = f"""
+				SELECT file_name
+				FROM File
+				WHERE month = {month}
+				ORDER BY {sort_by}
+
+			"""
+			result_list = [item[0] for item in self._select(sql, fetchall=True)]
+			print(result_list)
+			file_set = file_set.intersection(set(result_list))
+		print('file_set', file_set)
+		return list(file_set)
+
+	def _file_names_tag_statement(self, tag_list):
+		tag = tag_list.pop(0)
+		sql =  f"""
+				file_name IN (
+				SELECT file_name 
+				FROM FileTagName 
+				WHERE tag_name = "{tag}"
+				)
+				"""
+		if tag_list:
+			sql = sql + f""" AND {self._file_names_tag_statement(tag_list)} """
+			return sql
+		else:
+			return sql
+
+	def get_file_list(self, tags=[], year=None, month=None, sort_by='time'):
+		"""
+		"""
+		sql = """
+				SELECT file_name 
+				FROM File 
+		"""
+		# Add year and month
+		year_month_str_list = []
+		if year:
+			year_month_str_list.append(f"""
+						year = {year}
+						""")
+		if month:
+			year_month_str_list.append(f"""
+						month = {month}
+						""")
+		if year_month_str_list:
+			sql = sql + ' WHERE ' + ' AND '.join(year_month_str_list)
+
+		if tags:
+			if year_month_str_list:
+				sql = sql + ' AND '
+			else:
+				sql = sql + ' WHERE '
+			sql = sql + self._file_names_tag_statement(tags)
+
+		result_list = [item[0] for item in self._select(sql, fetchall=True)]
+		return result_list
+
+	def get_file_info(self, file_name):
+		sql = f"""
+				SELECT *
+				FROM File 
+				WHERE file_name = "{file_name}"
+				"""
+		info = dict(zip(self.file_items, self._select(sql, fetchall=True)[0]))
+		return info
+
+	def get_untagged_files(self):
+		sql = f"""
+				SELECT file_name
+				FROM File
+				"""
+		all_files = set([item[0] for item in self._select(sql, fetchall=True)])
+
+		sql = f"""
+			SELECT file_name
+			FROM FileTagName 
+			"""
+		tagged_files = set([item[0] for item in self._select(sql, fetchall=True)])
+
+		return sorted(all_files - tagged_files)
+
+	def get_location(self, file_name):
+		sql = f"""
+					SELECT location
+					FROM File
+					WHERE file_name = "{file_name}"
+					"""
+		return self._select(sql, fetchall=True)[0][0]
+
+	def get_year_list(self):
+		sql = f"""
+				SELECT year
+				FROM File
+				"""
+		return sorted(set([item[0] for item in self._select(sql, fetchall=True)]))
+
+	def _insert(self, *args, **kwargs):
 		"""
 		Call this to insert values into tables. 
 		"""
@@ -397,4 +557,9 @@ class FileDatabase(object):
 				conn.close()
 
 		return result
+
+	def _from_join_string_file_name(self):
+		return
+
+
 
