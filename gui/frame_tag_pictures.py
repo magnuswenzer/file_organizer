@@ -58,9 +58,9 @@ class FrameTagPictures(tk.Frame):
         self._set_tag_frame()
 
     def _set_image_frames(self):
-        self.image_widget_from = tkw.ImageWidget(self.frame_from, size=0.1)
+        self.image_widget_from = tkw.ImageWidget(self.frame_from, image_size=0.1)
         tkw.grid_configure(self.frame_from)
-        self.image_widget_to = tkw.ImageWidget(self.frame_to, size=0.1)
+        self.image_widget_to = tkw.ImageWidget(self.frame_to, image_size=0.1)
         tkw.grid_configure(self.frame_to)
 
     def _set_tag_frame(self):

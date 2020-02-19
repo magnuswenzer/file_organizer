@@ -236,8 +236,8 @@ class Controller(object):
 		self._reset_info()
 		location = self.db.get_location(file_name)
 		year, month_nr = location.split('/')
-		m = utils.Month(month_nr)
-		file_path = Path(f'{self.location}/{year}/{m.str}/{file_name}')
+		# m = utils.Month(month_nr)
+		file_path = Path(f'{self.location}/{year}/{month_nr}/{file_name}')
 		return file_path
 
 	def get_file_list(self, tags=None, year=None, month=None):

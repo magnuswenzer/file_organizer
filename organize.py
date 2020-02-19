@@ -138,8 +138,9 @@ class File(object):
 		# self.time_format = '%Y-%m-%d %H.%M.%S.%f'
 		# self.time_format = '%Y-%m-%d %H.%M.%S.%f'
 
-		mtime = self.original_path_object.stat().st_mtime
-		self.time = datetime.datetime.fromtimestamp(mtime)
+		# mtime = self.original_path_object.stat().st_mtime
+		# self.time = datetime.datetime.fromtimestamp(mtime)
+		self.time = get_creation_date(self.original_path_object)
 
 		self.new_path_object = Path(self.get_year_month_output_path(self.target_directory, change_year_to=change_year_to))
 		self._save_location()
@@ -151,36 +152,14 @@ class File(object):
 		return f'class: File({self.new_path_object})' 
 	
 	@property
-	def year(self): 
-		return self.time.year 
-
-	@year.setter
-	def year(self, year): 
-		year = str(year)
-		if len(year) != 4:
-			raise ValueError(f'Invalid year: {year}')
-		self.time = datetime.datetime.strptime(new_time_str, self.time_formats[0])
-		self._save_location()
+	def year(self):
+		if self.change_year_to:
+			return str(self.change_year_to)
+		return str(self.time.year)
 
 	@property
 	def month(self): 
-		return self.time.month 
-
-	@property
-	def day(self): 
-		return self.time.day
-
-	@property
-	def hour(self): 
-		return self.time.hour 
-
-	@property
-	def minute(self): 
-		return self.time.minute 
-
-	@property
-	def second(self): 
-		return self.time.second
+		return str(self.time.month).zfill(2)
 	
 	def get_year_month_output_path(self, root_directory, change_year_to=None):
 		"""
@@ -188,12 +167,10 @@ class File(object):
 		Also uses self.time_file_name.
 		"""
 		root_path = Path(root_directory)
-		year = str(self.time.year)
+		# month = utils.Month(self.time.month).str
 		if change_year_to:
 			year = change_year_to
-		month = utils.Month(self.time.month).str
-
-		file_path_object = root_path / year / month / f'{self.file_name}'
+		file_path_object = root_path / self.year / self.month / f'{self.file_name}'
 		return file_path_object
 
 	def _save_location(self): 

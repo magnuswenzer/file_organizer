@@ -52,6 +52,8 @@ class FrameViewPictures(tk.Frame):
         self.view_widget = tkw.ImageViewWidget(self,
                                                callback_change_image=self._on_change_image,
                                                rotation_info_object=self.controller.rotation_info_object,
+                                               # image_size=(800, 600),
+                                               image_size=20,
                                                row=1, column=0, **layout)
         notebook_prop = {'width': 500}
         self.notebook_widget = tkw.NotebookWidget(self, tabs=['Tagga', 'Info'], notebook_prop=notebook_prop, row=1, column=1, **layout)

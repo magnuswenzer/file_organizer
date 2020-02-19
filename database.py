@@ -45,8 +45,8 @@ class FileDatabase(object):
 			source text NOT NULL, 
 			suffix text NOT NULL, 
 			time timestamp, 
-			year integer NOT NULL, 
-			month integer NOT NULL 
+			year text NOT NULL, 
+			month text NOT NULL 
 			);
 			"""
 		self._execute(sql_files)
@@ -117,8 +117,8 @@ class FileDatabase(object):
 					 file_object.source, 
 					 file_object.suffix, 
 					 file_object.time,
-					 file_object.time.year,
-					 file_object.time.month)
+					 file_object.year,
+					 file_object.month)
 
 		return self._execute(sql_insert, variables=variables) 
 
@@ -429,7 +429,7 @@ class FileDatabase(object):
 		else:
 			return sql
 
-	def get_file_list(self, tags=[], year=None, month=None, sort_by='time'):
+	def get_file_list(self, tags=[], year=None, month=None, sort_by='file_name'):
 		"""
 		"""
 		sql = """
@@ -455,6 +455,8 @@ class FileDatabase(object):
 			else:
 				sql = sql + ' WHERE '
 			sql = sql + self._file_names_tag_statement(tags)
+
+		sql = sql + f" ORDER BY {sort_by}"
 
 		result_list = [item[0] for item in self._select(sql, fetchall=True)]
 		return result_list
