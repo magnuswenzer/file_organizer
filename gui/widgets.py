@@ -12,7 +12,8 @@ class ImageWidget(tk.Frame):
 
 	def __init__(self, 
 				 parent, 
-   				 image_size=20,
+   				 image_size=None,
+				 image_height=None,
 				 prop_frame={},
 				 rotation_info_object=None,
 				 **kwargs): 
@@ -33,12 +34,18 @@ class ImageWidget(tk.Frame):
 		self.rotation_info_object = rotation_info_object
 		self.showed_image = False
 
-		if type(image_size) in [int, float]:
-			if image_size > 1:
-				image_size = image_size / 100
-			self.image_size = image_size  # In percent
-		else:
-			self.image_size = image_size
+		self.image_size = None
+		self.image_height = image_height
+
+		if image_size:
+			if type(image_size) in [int, float]:
+				if image_size > 1:
+					image_size = image_size / 100
+				self.image_size = image_size  # In percent
+			else:
+				self.image_size = image_size
+		if image_height:
+			self.image_height = image_height
 
 		self._set_frame()
 
@@ -91,16 +98,11 @@ class ImageWidget(tk.Frame):
 		# print('self.label.winfo_width', self.label.winfo_width())
 		# print('self.label.winfo_height', self.label.winfo_height())
 		# print('self.image.size', self.image.size)
-
 		try:
 			if not self.showed_image:
 				self._set_frame()
 			self.original_image = Image.open(str(self.image_path))
-			width, height = self.original_image.size
-			if type(self.image_size) == float:
-				self.image = self.original_image.resize((int(width*self.image_size), int(height*self.image_size)))
-			else:
-				self.image = self.original_image.resize((self.image_size[0], self.image_size[1]))
+			self.image = self.original_image
 			if rotate:
 				if self.rotation_info_object:
 					rotate = self.rotation_info_object.get(self.image_path.name) + rotate
@@ -110,6 +112,19 @@ class ImageWidget(tk.Frame):
 					rotate = self.rotation_info_object.get(self.image_path.name)
 				else:
 					rotate = 0
+			self.image = self.image.rotate(rotate)
+			width, height = self.image.size
+			if self.image_height:
+				new_width = int(width * self.image_height / height)
+				self.image = self.original_image.resize((new_width, self.image_height))
+			elif self.image_size:
+				if type(self.image_size) == float:
+					self.image = self.original_image.resize((int(width*self.image_size), int(height*self.image_size)))
+				else:
+					self.image = self.original_image.resize((self.image_size[0], self.image_size[1]))
+			else:
+				self.image = self.original_image
+
 			self.image = self.image.rotate(rotate)
 			self.tk_image = ImageTk.PhotoImage(self.image)
 			# create new label here
@@ -121,7 +136,8 @@ class ImageWidget(tk.Frame):
 			print('self.label.winfo_height', self.label.winfo_height())
 			print('self.image.size', self.image.size)
 			return True
-		except:
+		except Exception as e:
+			# raise e
 			if self.showed_image:
 				self._set_frame()
 			self.stringvar.set(self.image_path)
@@ -148,12 +164,14 @@ class ImageViewWidget(tk.Frame):
 				 parent,
 				 callback_change_image=None,
 				 rotation_info_object=None,
-				 image_size=20,
+				 image_size=None,
+				 image_height=None,
 				 prop_frame={}, 
 				 **kwargs): 
 
 		self.callback_change_image = callback_change_image
 		self.image_size = image_size
+		self.image_height = image_height
 		self.prop_frame = {}
 		self.prop_frame.update(prop_frame)
 
@@ -182,6 +200,7 @@ class ImageViewWidget(tk.Frame):
 		# tk.Label(self, textvariable=self.stringvar_file_name).grid(row=0, column=0, **layout)
 		self.image_widget = ImageWidget(self,
 										image_size=self.image_size,
+										image_height=self.image_height,
 										rotation_info_object=self.rotation_info_object,
 										row=0, columnspan=3, **layout)
 

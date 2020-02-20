@@ -34,6 +34,9 @@ def get_file_mapping(root_directory, suffix=None, nr_files=None):
 			return data
 	return data
 
+def get_modification_date(path_to_file):
+	ts = os.path.getmtime(path_to_file)
+	return datetime.datetime.utcfromtimestamp(ts)
 
 def get_creation_date(path_to_file):
 	"""
@@ -59,7 +62,7 @@ def get_time_file_name(path_object, change_year_to=None):
 	"""
 	Returns the given file name with a prefix representing the time och creation.
 	"""
-	time = get_creation_date(str(path_object))
+	time = get_modification_date(str(path_object))
 	time_str = time.strftime('%Y%m%d%H%M%S')
 	if change_year_to:
 		time_str = str(change_year_to) + time_str[4:]
@@ -140,7 +143,7 @@ class File(object):
 
 		# mtime = self.original_path_object.stat().st_mtime
 		# self.time = datetime.datetime.fromtimestamp(mtime)
-		self.time = get_creation_date(self.original_path_object)
+		self.time = get_modification_date(self.original_path_object)
 
 		self.new_path_object = Path(self.get_year_month_output_path(self.target_directory, change_year_to=change_year_to))
 		self._save_location()

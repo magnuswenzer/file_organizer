@@ -124,7 +124,7 @@ class FrameAddPictures(tk.Frame):
         text = [f'{len(files_copied)} filer kopierades',
                 f'{len(files_same_size)} filer hade samma storlek (troligen dubletter)',
                 f'{len(files_different_size)} filer hade olika storlek (kolla dessa i files_different_size.txt)',
-                f'{len(files_not_in_db)} filer finns inte eller kunde inte låggas till i databasen']
+                f'{len(files_not_in_db)} filer finns inte eller kunde inte loggas till i databasen']
 
         messagebox.showinfo('Lagg till bilder', '\n'.join(text))
 
