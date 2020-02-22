@@ -132,6 +132,7 @@ class FrameViewPictures(tk.Frame):
         if self.intvar_show_filter.get():
             tag_type_names = self.controller.get_tag_names_in_tag_types()
             self.filter_frame = tkw.FilterPopup(self,
+                                                controller=self.controller,
                                                 tag_type_names=tag_type_names,
                                                 year_list=self.controller.get_year_list(),
                                                 callback_ok=self._on_ok_filter,

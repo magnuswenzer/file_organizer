@@ -440,11 +440,11 @@ class FileDatabase(object):
 		year_month_str_list = []
 		if year:
 			year_month_str_list.append(f"""
-						year = {year}
+						year = "{year}"
 						""")
 		if month:
 			year_month_str_list.append(f"""
-						month = {month}
+						month = "{month}"
 						""")
 		if year_month_str_list:
 			sql = sql + ' WHERE ' + ' AND '.join(year_month_str_list)
@@ -457,7 +457,9 @@ class FileDatabase(object):
 			sql = sql + self._file_names_tag_statement(tags)
 
 		sql = sql + f" ORDER BY {sort_by}"
-
+		# print('='*30)
+		# print(sql)
+		# print('-'*30)
 		result_list = [item[0] for item in self._select(sql, fetchall=True)]
 		return result_list
 
@@ -497,6 +499,14 @@ class FileDatabase(object):
 		sql = f"""
 				SELECT year
 				FROM File
+				"""
+		return sorted(set([item[0] for item in self._select(sql, fetchall=True)]))
+
+	def get_months_for_year(self, year):
+		sql = f"""
+				SELECT month
+				FROM File 
+				WHERE year = "{year}"
 				"""
 		return sorted(set([item[0] for item in self._select(sql, fetchall=True)]))
 

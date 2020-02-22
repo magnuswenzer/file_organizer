@@ -96,6 +96,9 @@ class App(tk.Tk):
 
 	def _on_select_db(self, event=None):
 		current_db = self.stringvar_db.get().strip()
+		print(current_db)
+		print(self.databases.data)
+		print('=', self.databases.get_location(current_db))
 		self.stringvar_location.set(self.databases.get_location(current_db))
 
 	def _update_popup_start_window(self):

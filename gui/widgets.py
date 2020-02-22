@@ -298,6 +298,7 @@ class ImageViewWidget(tk.Frame):
 class SelectTagWidget(tk.Frame):
 	def __init__(self,
 				 parent,
+				 controller=None,
 				 tag_type_names=None,
 				 year_list=[],
 				 prop_frame={},
@@ -316,12 +317,14 @@ class SelectTagWidget(tk.Frame):
 		tk.Frame.__init__(self, parent, **self.prop_frame)
 		self.grid(**self.grid_frame)
 
+		self.controller = controller
+
 		self.year_list = [str(y) for y in year_list]
 
-		self.month_list = utils.get_swe_month_list()
+		self.month_list = [str(n).zfill(2) for n in range(1, 13)]
 		self.month_to_num = {}
-		for n, m in enumerate(self.month_list):
-			self.month_to_num[m] = n + 1
+		# for n, m in enumerate(self.month_list):
+		# 	self.month_to_num[m] = n + 1
 
 		self._set_frame()
 
@@ -346,19 +349,27 @@ class SelectTagWidget(tk.Frame):
 		layout = dict(padx=5,
 					  pady=5,
 					  sticky='nsew')
-		self.stringvar_month = tk.StringVar()
-		self.combobox_month = ttk.Combobox(frame, textvariable=self.stringvar_month)
-		self.combobox_month.grid(row=0, column=0, **layout)
-		self.combobox_month['values'] = [''] + self.month_list
-		self.combobox_month.config(state='readonly')
 
+		tk.Label(frame, text='År').grid(row=0, column=0, **layout)
 		self.stringvar_year = tk.StringVar()
 		self.combobox_year = ttk.Combobox(frame, textvariable=self.stringvar_year)
-		self.combobox_year.grid(row=1, column=0, **layout)
+		self.combobox_year.grid(row=0, column=1, **layout)
 		self.combobox_year['values'] = [''] + self.year_list
 		self.combobox_year.config(state='readonly')
+		self.combobox_year.bind("<<ComboboxSelected>>", self._on_select_year)
+
+		tk.Label(frame, text='Månad').grid(row=1, column=0, **layout)
+		self.stringvar_month = tk.StringVar()
+		self.combobox_month = ttk.Combobox(frame, textvariable=self.stringvar_month)
+		self.combobox_month.grid(row=1, column=1, **layout)
+		self.combobox_month.config(state='readonly')
 
 		grid_configure(self, nr_rows=2)
+
+	def _on_select_year(self, event=None):
+		year = self.stringvar_year.get()
+		month_list = self.controller.get_months_for_year(year)
+		self.combobox_month['values'] = [''] + month_list
 
 	def get_filter(self):
 		selected_filter = {}
@@ -372,8 +383,8 @@ class SelectTagWidget(tk.Frame):
 		month = self.stringvar_month.get()
 		if not month:
 			month = None
-		else:
-			month = self.month_to_num.get(month)
+		# else:
+		# 	month = self.month_to_num.get(month)
 		selected_filter['month'] = month
 
 		year = self.stringvar_year.get().strip()
@@ -496,10 +507,12 @@ class TagWidget(tk.Frame):
 class FilterPopup(tk.Toplevel):
 
 	def __init__(self, parent,
+				 controller=None,
 				 tag_type_names=None,
 				 year_list=[],
 				 callback_ok=None,
 				 callback_cancel=None):
+		self.controller = controller
 		self.tag_type_names = tag_type_names
 		self.year_list = year_list
 		self.callback_ok = callback_ok
@@ -519,6 +532,7 @@ class FilterPopup(tk.Toplevel):
 					  pady=5,
 					  sticky='nsew')
 		self.select_tag_widget = SelectTagWidget(self,
+												 controller=self.controller,
 												 tag_type_names=self.tag_type_names,
 												 year_list=self.year_list,
 												 row=0, column=0,

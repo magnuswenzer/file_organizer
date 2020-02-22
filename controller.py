@@ -280,6 +280,10 @@ class Controller(object):
 		self._reset_info()
 		return self.db.get_year_list()
 
+	def get_months_for_year(self, year):
+		self._reset_info()
+		return self.db.get_months_for_year(year)
+
 
 class Databases(object):
 
