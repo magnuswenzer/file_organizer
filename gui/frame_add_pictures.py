@@ -65,7 +65,7 @@ class FrameAddPictures(tk.Frame):
         tk.Label(self, text='Ändra år till:').grid(row=4, column=0, **layout)
         self.stringvar_year = tk.StringVar()
         self.entry_year = tk.Entry(self, textvariable=self.stringvar_year)
-        self.entry_year.grid(row=4, column=1, **layout)
+        # self.entry_year.grid(row=4, column=1, **layout)
 
         self.button_add_images = tk.Button(self, text='Lägg till bilder', command=self._add_images)
         self.button_add_images.grid(row=5, column=0, columnspan=2, **layout)

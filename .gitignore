@@ -1,6 +1,7 @@
 *.sqlite3
 databases.txt
 rotation.txt
+files_different_size.txt
 .idea/
 .DS_Store
 

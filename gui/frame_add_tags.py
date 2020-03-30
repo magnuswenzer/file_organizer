@@ -106,6 +106,7 @@ class FrameAddTags(tk.Frame):
 		self.stringvar_type_for_name = tk.StringVar()
 		self.combobox_add_tag_name = ttk.Combobox(frame, textvariable=self.stringvar_type_for_name)
 		self.combobox_add_tag_name.grid(row=1, column=0, **layout)
+		self.combobox_add_tag_name.config(state='readonly')
 
 		self.stringvar_add_tag_name = tk.StringVar()
 		self.entry_add_tag_name = tk.Entry(frame, textvariable=self.stringvar_add_tag_name)

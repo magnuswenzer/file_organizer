@@ -116,6 +116,7 @@ class App(tk.Tk):
 		self.location = location
 		self.controller.set_database(db_name, location)
 		self.window_select_db.destroy()
+		tk.Tk.wm_title(self, f'Python Bildvidsare: {self.database_name}')
 		self._set_frame()
 		self.update_app()
 

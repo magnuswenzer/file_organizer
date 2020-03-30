@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk 
 
 from PIL import ImageTk, Image
+import imageio
 
 import re
 
@@ -101,7 +102,16 @@ class ImageWidget(tk.Frame):
 		try:
 			if not self.showed_image:
 				self._set_frame()
-			self.original_image = Image.open(str(self.image_path))
+
+			print('self.image_path.suffix', self.image_path.suffix)
+			if self.image_path.suffix == '.mp4':
+				video = imageio.get_reader(self.image_path)
+				image = video.get_next_data()
+				self.original_image = Image.fromarray(image)
+				# self.tk_image = ImageTk.PhotoImage(Image.fromarray(image))
+			else:
+				self.original_image = Image.open(str(self.image_path))
+				print('self.original_image', self.original_image)
 			self.image = self.original_image
 			if rotate:
 				if self.rotation_info_object:
@@ -124,7 +134,6 @@ class ImageWidget(tk.Frame):
 					self.image = self.original_image.resize((self.image_size[0], self.image_size[1]))
 			else:
 				self.image = self.original_image
-
 			self.image = self.image.rotate(rotate)
 			self.tk_image = ImageTk.PhotoImage(self.image)
 			# create new label here
@@ -137,7 +146,7 @@ class ImageWidget(tk.Frame):
 			print('self.image.size', self.image.size)
 			return True
 		except Exception as e:
-			# raise e
+			raise e
 			if self.showed_image:
 				self._set_frame()
 			self.stringvar.set(self.image_path)
@@ -670,6 +679,7 @@ class FileTreeviewWidget(tk.Frame):
 
 		self.items = dict()
 		for year in sorted(self.data):
+			print(year)
 			iid = '-year-' + str(year)
 			self.items[year] = dict()
 			self.items[year]['value'] = self.tree.insert("", 1, iid=iid, text=str(year), values=(''))
@@ -1469,7 +1479,7 @@ class ListboxSelectionWidget(tk.Frame):
 
 def grid_configure(frame, nr_rows=1, nr_columns=1, **kwargs):
 	""" 
-	Created by me originaly for SMHI (https://github.com/sharksmhi/sharkpylib/tree/master/sharkpylib/tklib). 
+	Created by me originally for SMHI (https://github.com/sharksmhi/sharkpylib/tree/master/sharkpylib/tklib).
 	
 	Put weighting on the given tkinter widget. Put weighting on the number of rows and columns given. 
 	kwargs with tag "row"(r) or "columns"(c) sets the number in tag as weighting. 
